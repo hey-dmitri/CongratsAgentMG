@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Review — {{ session.race_name }}{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('review.upload_page') }}">Start</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">Batch Review</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h1 class="h3 fw-bold mb-0">{{ session.race_name }}</h1>
+    <p class="text-muted mb-0">{{ session.race_date }} &nbsp;·&nbsp; {{ session.total }} entries to review</p>
+  </div>
+  {% if session.is_complete %}
+  <form method="POST" action="{{ url_for('review.finalize', session_id=session.session_id) }}">
+    <button type="submit" class="btn btn-success btn-lg">
+      Finalize Batch &rarr;
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Progress bar -->
+<div class="card mb-4 shadow-sm">
+  <div class="card-body py-3">
+    <div class="d-flex justify-content-between mb-1">
+      <span class="small text-muted">Progress</span>
+      <span class="small fw-semibold" id="progress-label">
+        {{ session.reviewed_count }} / {{ session.total }} reviewed
+      </span>
+    </div>
+    <div class="progress" style="height: 10px;">
+      <div
+        class="progress-bar bg-success"
+        role="progressbar"
+        id="progress-bar"
+        style="width: {{ (session.reviewed_count / session.total * 100) | int if session.total else 0 }}%"
+      ></div>
+    </div>
+    <div class="d-flex gap-3 mt-2 small text-muted">
+      <span>✅ {{ session.approved_count }} approved</span>
+      <span>⏭️ {{ session.skipped_count }} skipped</span>
+      <span>⏳ {{ session.pending_count }} pending</span>
+    </div>
+  </div>
+</div>
+
+<!-- Entry list -->
+<div class="row g-3">
+  {% for entry in session.entries %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm entry-card status-{{ entry.status }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="badge
+            {% if entry.status == 'approved' %}bg-success
+            {% elif entry.status == 'edited' %}bg-info
+            {% elif entry.status == 'skipped' %}bg-secondary
+            {% else %}bg-warning text-dark{% endif %}
+          ">{{ entry.status | title }}</span>
+          <span class="text-muted small">#{{ entry.place }} in {{ entry.category }}</span>
+        </div>
+        <h5 class="card-title mb-1">{{ entry.finisher.full_name }}</h5>
+        <p class="card-text text-muted small mb-1">
+          {{ entry.finisher.city }}, {{ entry.finisher.state }}
+          &nbsp;·&nbsp; {{ entry.finisher.finish_time }}
+        </p>
+        <p class="card-text small mb-2">
+          {% if entry.handle_suggestion.instagram_handle or entry.handle_suggestion.facebook_url %}
+            <span class="badge
+              {% if entry.handle_suggestion.confidence == 'high' %}bg-success
+              {% elif entry.handle_suggestion.confidence == 'medium' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}">
+              {{ entry.handle_suggestion.confidence | upper }}
+            </span>
+            &nbsp; {{ entry.handle_suggestion.instagram_handle or entry.handle_suggestion.facebook_name }}
+          {% else %}
+            <span class="badge bg-danger">Not Found</span>
+          {% endif %}
+        </p>
+        {% if entry.status == 'pending' %}
+        <a
+          href="{{ url_for('review.entry_view', session_id=session.session_id, entry_id=entry.id) }}"
+          class="btn btn-primary btn-sm w-100"
+        >Review &amp; Approve</a>
+        {% else %}
+        <a
+          href="{{ url_for('review.entry_view', session_id=session.session_id, entry_id=entry.id) }}"
+          class="btn btn-outline-secondary btn-sm w-100"
+        >View / Edit</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Poll session status every 5s to update progress bar
+const sessionId = "{{ session.session_id }}";
+const statusUrl = `/review/${sessionId}/status`;
+
+let pollInterval;
+
+function updateProgress() {
+  fetch(statusUrl)
+    .then(r => r.json())
+    .then(data => {
+      const pct = data.total ? Math.round(data.reviewed / data.total * 100) : 0;
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('progress-label').textContent =
+        `${data.reviewed} / ${data.total} reviewed`;
+      if (data.is_complete) {
+        clearInterval(pollInterval);
+      }
+    })
+    .catch(() => {});
+}
+pollInterval = setInterval(updateProgress, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Start{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item active" aria-current="page">Start</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Left: Upload -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-2 fw-bold">Upload Race Results</h1>
+        <p class="text-muted mb-4">
+          Upload a MarathonGuide.com results CSV. The tool identifies top finishers,
+          suggests social handles, and generates congratulatory post copy for your review.
+        </p>
+
+        <form method="POST" action="{{ url_for('review.upload') }}" enctype="multipart/form-data">
+          <div class="mb-4">
+            <label for="csv_file" class="form-label fw-semibold">Race Results CSV</label>
+            <input
+              class="form-control"
+              type="file"
+              id="csv_file"
+              name="csv_file"
+              accept=".csv"
+              required
+            >
+            <div class="form-text mt-1">
+              The race name is taken from the filename — e.g. <code>results 23-1_02 - Atlanta Marathon.csv</code> → <strong>Atlanta Marathon</strong>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100" id="upload-btn">
+            <span class="spinner-border spinner-border-sm d-none me-2" id="upload-spinner"></span>
+            Process Results &amp; Generate Posts
+          </button>
+        </form>
+
+        <hr class="my-4">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="text-muted small">
+            Search cache: <strong>{{ cache_size }} entr{{ 'y' if cache_size == 1 else 'ies' }}</strong>
+            {% if cache_size > 0 %} — cached results will be reused{% endif %}
+          </span>
+          {% if cache_size > 0 %}
+          <form method="POST" action="{{ url_for('review.clear_cache') }}" class="mb-0">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Clear Cache</button>
+          </form>
+          {% endif %}
+        </div>
+
+        <p class="text-muted small fw-semibold mb-2">Expected CSV columns</p>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Column</th>
+                <th>Example</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>OverallPlace</code></td><td>1</td><td>Required</td></tr>
+              <tr><td><code>Bib</code></td><td>1227</td><td>Required</td></tr>
+              <tr><td><code>FirstName</code></td><td>Samuel</td><td>Required</td></tr>
+              <tr><td><code>LastName</code></td><td>Stresemann</td><td>Required</td></tr>
+              <tr><td><code>Sex</code></td><td>M / F / NB</td><td>Required</td></tr>
+              <tr><td><code>Age</code></td><td>27</td><td>Required — age group derived automatically</td></tr>
+              <tr><td><code>FinalTime</code></td><td>2:34:47</td><td>Required</td></tr>
+              <tr><td><code>City</code></td><td>Atlanta</td><td>Optional</td></tr>
+              <tr><td><code>State</code></td><td>GA</td><td>Optional</td></tr>
+              <tr><td><code>RaceDate</code></td><td>03/01/2026</td><td>Optional</td></tr>
+              <tr class="table-light"><td><code>SexPlace</code></td><td>1</td><td>Optional — calculated if missing</td></tr>
+              <tr class="table-light"><td><code>AgeGroup</code></td><td>M25-29</td><td>Optional — derived from Age if missing</td></tr>
+              <tr class="table-light"><td><code>AgeGroupPlace</code></td><td>1</td><td>Optional — calculated if missing</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="my-4">
+        <p class="text-muted small fw-semibold mb-1">What happens next</p>
+        <ol class="text-muted small mb-0">
+          <li>Top finishers are identified — Overall top 3 Male + top 3 Female (6 entries)</li>
+          <li>Claude AI suggests Instagram &amp; Facebook handles for each finisher</li>
+          <li>Claude AI writes Instagram + Facebook post copy</li>
+          <li>You review, edit, and approve each post — nothing is posted automatically</li>
+          <li>Approved posts are logged and a Slack summary is sent</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Recently Approved Posts -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Recently Approved Posts</span>
+        {% if recent_approved %}
+        <span class="badge bg-secondary">{{ recent_approved | length }}</span>
+        {% endif %}
+      </div>
+
+      {% if recent_approved %}
+      <ul class="list-group list-group-flush" style="max-height: 75vh; overflow-y: auto;">
+        {% for post in recent_approved %}
+        <li class="list-group-item py-3">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div>
+              <span class="fw-semibold">{{ post.runner_name }}</span>
+              <span class="text-muted small ms-2">{{ post.category }} · #{{ post.place }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-{{ 'info' if post.status == 'edited' else 'success' }}">
+                {{ post.status | title }}
+              </span>
+              {% if post.approved_at_display %}
+              <span class="text-muted" style="font-size: 0.7rem;">{{ post.approved_at_display }}</span>
+              {% endif %}
+              <a href="{{ url_for('review.entry_view', session_id=post.session_id, entry_id=post.entry_id) }}"
+                 class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.75rem;">Edit</a>
+            </div>
+          </div>
+          <div class="text-muted small mb-1">{{ post.race_name }}{% if post.race_date %} · {{ post.race_date }}{% endif %}</div>
+          {% if post.instagram_handle %}
+          <div class="small mb-1"><span class="text-secondary">Instagram:</span> {{ post.instagram_handle }}</div>
+          {% endif %}
+          {% if post.instagram_text %}
+          <div class="small text-muted fst-italic" style="white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{{ post.instagram_text }}</div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-center text-muted py-5">
+        <div class="mb-2" style="font-size: 2rem;">📭</div>
+        <p class="mb-0">No approved posts yet.</p>
+        <p class="small">Approved posts will appear here after you finalize a batch.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelector('form').addEventListener('submit', function() {
+  document.getElementById('upload-spinner').classList.remove('d-none');
+  document.getElementById('upload-btn').disabled = true;
+  document.getElementById('upload-btn').lastChild.textContent = ' Processing… (this may take 1–2 minutes)';
+});
+</script>
+{% endblock %}

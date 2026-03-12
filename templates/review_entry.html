@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.finisher.full_name }} — Review{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('review.upload_page') }}">Start</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('review.dashboard', session_id=session.session_id) }}">Batch Review</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">{{ entry.finisher.full_name }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3 gap-2">
+  <button type="submit" form="approve-form" class="btn btn-success">✅ Approve</button>
+  <button type="submit" form="skip-form" class="btn btn-outline-secondary">⏭️ Skip</button>
+</div>
+
+<div class="row g-4">
+  <!-- Left: Runner info + AI suggestion -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header fw-semibold bg-light">Runner Info</div>
+      <div class="card-body">
+        <h4 class="mb-1">{{ entry.finisher.full_name }}</h4>
+        <p class="text-muted small mb-2">{{ entry.finisher.city }}, {{ entry.finisher.state }}</p>
+        <table class="table table-sm table-borderless mb-0">
+          <tr><td class="text-muted">Category</td><td>{{ entry.category }}</td></tr>
+          <tr><td class="text-muted">Place</td><td>{{ entry.place }}</td></tr>
+          <tr><td class="text-muted">Finish Time</td><td>{{ entry.finisher.finish_time }}</td></tr>
+          <tr><td class="text-muted">Age Group</td><td>{{ entry.finisher.age_group }}</td></tr>
+          <tr><td class="text-muted">Age / Gender</td><td>{{ entry.finisher.age }} / {{ entry.finisher.gender }}</td></tr>
+          <tr><td class="text-muted">Bib</td><td>{{ entry.finisher.bib }}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold bg-light d-flex justify-content-between align-items-center">
+        AI Handle Suggestion
+        {% if entry.handle_suggestion.instagram_handle or entry.handle_suggestion.facebook_url %}
+          <span class="badge
+            {% if entry.handle_suggestion.confidence == 'high' %}bg-success
+            {% elif entry.handle_suggestion.confidence == 'medium' %}bg-warning text-dark
+            {% else %}bg-secondary{% endif %}
+          ">{{ entry.handle_suggestion.confidence | upper }}</span>
+        {% else %}
+          <span class="badge bg-danger">Not Found</span>
+        {% endif %}
+      </div>
+      <div class="card-body small">
+        {% if entry.handle_suggestion.instagram_handle %}
+        <p class="mb-1">
+          <strong>Instagram:</strong>
+          {% if entry.handle_suggestion.instagram_url %}
+            <a href="{{ entry.handle_suggestion.instagram_url }}" target="_blank">{{ entry.handle_suggestion.instagram_handle }}</a>
+          {% else %}
+            {{ entry.handle_suggestion.instagram_handle }}
+          {% endif %}
+        </p>
+        {% endif %}
+        {% if entry.handle_suggestion.facebook_name %}
+        <p class="mb-1">
+          <strong>Facebook:</strong>
+          {% if entry.handle_suggestion.facebook_url %}
+            <a href="{{ entry.handle_suggestion.facebook_url }}" target="_blank">{{ entry.handle_suggestion.facebook_name }}</a>
+          {% else %}
+            {{ entry.handle_suggestion.facebook_name }}
+          {% endif %}
+        </p>
+        {% endif %}
+        {% if not entry.handle_suggestion.instagram_handle and not entry.handle_suggestion.facebook_url %}
+        <p class="text-muted mb-1">No handles found — fill in manually if known.</p>
+        {% endif %}
+        {% if entry.handle_suggestion.reasoning %}
+        <p class="text-muted mt-2 mb-0 fst-italic">{{ entry.handle_suggestion.reasoning }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Edit form -->
+  <div class="col-lg-8">
+    <form id="approve-form" method="POST" action="{{ url_for('review.approve_entry', session_id=session.session_id, entry_id=entry.id) }}">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold bg-light">Social Handles</div>
+        <div class="card-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Instagram Handle</label>
+            <input
+              type="text"
+              class="form-control"
+              name="instagram_handle"
+              placeholder="@username"
+              value="{{ entry.final_instagram_handle }}"
+            >
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Facebook Profile URL</label>
+            <input
+              type="url"
+              class="form-control"
+              name="facebook_url"
+              placeholder="https://facebook.com/..."
+              value="{{ entry.final_facebook_url }}"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold bg-light d-flex justify-content-between">
+          Instagram Post
+          <span class="text-muted small" id="ig-counter">0 / 280</span>
+        </div>
+        <div class="card-body">
+          <textarea
+            class="form-control font-monospace"
+            name="instagram_text"
+            id="instagram_text"
+            rows="5"
+            maxlength="280"
+          >{{ entry.final_instagram_text }}</textarea>
+          <div class="form-text">Max 280 characters.</div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold bg-light">Facebook Post</div>
+        <div class="card-body">
+          <textarea
+            class="form-control"
+            name="facebook_text"
+            id="facebook_text"
+            rows="4"
+          >{{ entry.final_facebook_text }}</textarea>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold bg-light">Reviewer Notes <span class="text-muted fw-normal">(optional)</span></div>
+        <div class="card-body">
+          <input
+            type="text"
+            class="form-control"
+            name="reviewer_notes"
+            placeholder="Internal notes..."
+            value="{{ entry.reviewer_notes }}"
+          >
+        </div>
+      </div>
+
+    </form>
+
+    <form id="skip-form" method="POST" action="{{ url_for('review.skip_entry', session_id=session.session_id, entry_id=entry.id) }}" class="mt-2">
+      <input type="hidden" name="reviewer_notes" id="skip-notes" value="">
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Instagram character counter
+const igTextarea = document.getElementById('instagram_text');
+const igCounter = document.getElementById('ig-counter');
+
+function updateIgCounter() {
+  const len = igTextarea.value.length;
+  igCounter.textContent = `${len} / 280`;
+  igCounter.className = len > 260 ? 'text-danger small' : 'text-muted small';
+}
+
+igTextarea.addEventListener('input', updateIgCounter);
+updateIgCounter();
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Processing — {{ session.race_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5 text-center">
+    <div class="card shadow-sm mt-5">
+      <div class="card-body p-5">
+        <div class="mb-4" style="font-size: 3rem;">🔍</div>
+        <h2 class="h4 fw-bold mb-1">Processing {{ session.race_name }}</h2>
+        <p class="text-muted mb-4">Searching social handles and generating post copy…</p>
+
+        <div class="progress mb-3" style="height: 12px;">
+          <div
+            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+            role="progressbar"
+            id="progress-bar"
+            style="width: 0%"
+          ></div>
+        </div>
+
+        <p class="text-muted small mb-0" id="status-text">Starting…</p>
+        <p class="text-muted small mt-2" id="step-detail"></p>
+
+        <div class="alert alert-danger mt-4 d-none" id="error-box"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sessionId = "{{ session.session_id }}";
+const dashboardUrl = "/review/" + sessionId;
+const statusUrl = "/review/" + sessionId + "/processing-status";
+
+const steps = [
+  "Searching Google for social profiles…",
+  "Fetching profile pages…",
+  "Claude is analyzing candidates…",
+  "Generating post copy…",
+];
+
+let stepIndex = 0;
+
+function updateStepHint() {
+  document.getElementById("step-detail").textContent = steps[stepIndex % steps.length];
+  stepIndex++;
+}
+
+function poll() {
+  fetch(statusUrl)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        showError("Session not found.");
+        return;
+      }
+
+      const pct = data.total ? Math.round(data.processed / data.total * 100) : 0;
+      document.getElementById("progress-bar").style.width = pct + "%";
+      document.getElementById("status-text").textContent =
+        `${data.processed} of ${data.total} runners processed`;
+
+      updateStepHint();
+
+      if (data.done) {
+        if (data.error) {
+          showError("Processing error: " + data.error);
+        } else {
+          document.getElementById("status-text").textContent = "Done! Redirecting…";
+          document.getElementById("progress-bar").style.width = "100%";
+          document.getElementById("step-detail").textContent = "";
+          setTimeout(() => { window.location.href = dashboardUrl; }, 800);
+        }
+      } else {
+        setTimeout(poll, 2000);
+      }
+    })
+    .catch(() => setTimeout(poll, 3000));
+}
+
+function showError(msg) {
+  const box = document.getElementById("error-box");
+  box.textContent = msg;
+  box.classList.remove("d-none");
+}
+
+updateStepHint();
+setTimeout(poll, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Batch Complete{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('review.upload_page') }}">Start</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('review.dashboard', session_id=session.session_id) }}">Batch Review</a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">Batch Complete</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+      <div>
+        <h1 class="h2 fw-bold mb-1">Batch Complete!</h1>
+        <p class="text-muted mb-0">{{ session.race_name }} — {{ session.race_date }}</p>
+      </div>
+      <a href="{{ url_for('review.upload_page') }}" class="btn btn-primary">
+        Upload Another Race
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+          <div class="card-body py-3">
+            <div class="h2 fw-bold mb-0">{{ session.total }}</div>
+            <div class="small text-muted">Total Entries</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm border-success">
+          <div class="card-body py-3">
+            <div class="h2 fw-bold text-success mb-0">{{ session.approved_count }}</div>
+            <div class="small text-muted">Approved</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+          <div class="card-body py-3">
+            <div class="h2 fw-bold text-secondary mb-0">{{ session.skipped_count }}</div>
+            <div class="small text-muted">Skipped</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+          <div class="card-body py-3">
+            <div class="h2 fw-bold text-info mb-0">{{ approved | selectattr("status", "equalto", "edited") | list | length }}</div>
+            <div class="small text-muted">Edited</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approved entries list -->
+    {% if approved %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold bg-light">Approved Posts ({{ approved | length }})</div>
+      <ul class="list-group list-group-flush">
+        {% for entry in approved %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ entry.finisher.full_name }}</strong>
+              <span class="text-muted small ms-2">{{ entry.category }} · Place {{ entry.place }}</span>
+            </div>
+            <span class="badge bg-{{ 'info' if entry.status == 'edited' else 'success' }}">
+              {{ entry.status | title }}
+            </span>
+          </div>
+          {% if entry.final_instagram_handle %}
+          <div class="small text-muted mt-1">{{ entry.final_instagram_handle }}</div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
